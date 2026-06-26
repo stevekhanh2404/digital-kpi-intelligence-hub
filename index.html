@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Digital KPI Intelligence Hub - nhập báo cáo Excel và tự động tạo dashboard, đánh giá KPI, báo cáo chi tiết và Pivot Table ngay trên trình duyệt." />
+  <meta name="description" content="Digital KPI Intelligence Hub v1.1 - nhập báo cáo Excel và tự động tạo dashboard, đánh giá KPI, báo cáo chi tiết và Pivot Table ngay trên trình duyệt." />
   <meta name="color-scheme" content="dark light" />
   <title>Digital KPI Intelligence Hub | Steve Khanh</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%2355dcf4'/%3E%3Cstop offset='1' stop-color='%23748dff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='17' fill='url(%23g)'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial,sans-serif' font-size='25' font-weight='800' fill='%2306111e'%3ESK%3C/text%3E%3C/svg%3E" />
@@ -437,6 +437,8 @@
     awarenessRecords: [],
     tiktokDaily: [],
     shopeeMonthly: [],
+    primaryMonthSheet: null,
+    kpiGrandTotal: null,
     errors: [],
     warnings: [],
     pivotDatasets: new Map(),
@@ -516,6 +518,45 @@
       if (partial) return partial;
     }
     return null;
+  }
+
+
+  function monthSheetInfo(name) {
+    const m = norm(name).match(/^thang\s*0?(\d{1,2})\.(\d{4})$/i);
+    return m ? {name, month:Number(m[1]), year:Number(m[2])} : null;
+  }
+
+  function selectPrimaryMonthSheet() {
+    if (!state.workbook) return null;
+    const candidates = state.workbook.SheetNames.map(monthSheetInfo).filter(Boolean);
+    if (!candidates.length) return state.workbook.SheetNames[0] || null;
+
+    const fileName = norm(state.file?.name || '');
+    const filePeriod = fileName.match(/thang\s*0?(\d{1,2})(?:[.\-_/ ]+(\d{4}))?/i);
+    if (filePeriod) {
+      const wantedMonth = Number(filePeriod[1]);
+      const wantedYear = filePeriod[2] ? Number(filePeriod[2]) : null;
+      const matching = candidates
+        .filter(x => x.month === wantedMonth && (!wantedYear || x.year === wantedYear))
+        .sort((a,b) => b.year - a.year || b.month - a.month);
+      if (matching.length) return matching[0].name;
+    }
+
+    return candidates.sort((a,b) => b.year - a.year || b.month - a.month)[0].name;
+  }
+
+  function isGrandTotalBrand(item) {
+    const n = norm(item?.brand ?? item?.Brand ?? '');
+    return n === 'total' || n === 'tong';
+  }
+
+  function compactMoney(v) {
+    if (!isNum(v)) return '—';
+    const a=Math.abs(v);
+    if (a>=1e9) return `${(v/1e9).toFixed(2).replace(/\.?0+$/,'')}B`;
+    if (a>=1e6) return `${(v/1e6).toFixed(1).replace(/\.0$/,'')}M`;
+    if (a>=1e3) return `${(v/1e3).toFixed(1).replace(/\.0$/,'')}K`;
+    return fmt(v);
   }
 
   function getMatrix(sheetName, display=false) {
@@ -757,17 +798,18 @@
 
   function buildPivotDatasets() {
     state.pivotDatasets.clear();
+    const monthSheet = state.primaryMonthSheet || selectPrimaryMonthSheet();
     const priority = [
-      'Tháng 6.2026','TỔNG 2026','KPI CHI TIẾT 2026','Brand Awareness',
+      monthSheet,'TỔNG 2026','KPI CHI TIẾT 2026','Brand Awareness',
       'ĐƠN HÀNG ONLINE + SP AFF','ĐƠN HÀNG SHOPEE','ĐƠN HÀNG TIKTOK'
-    ];
+    ].filter(Boolean);
     for (const label of priority) {
       const sheet=findSheet(label);
       if (!sheet) continue;
       const matrix=getMatrix(sheet,false);
       const datasets=[];
       const n=norm(sheet);
-      if (n.includes('thang 6.2026') || n.includes('tong 2026') || n.includes('kpi chi tiet 2026')) {
+      if (/^thang\s*\d{1,2}\.\d{4}$/.test(n) || n.includes('tong 2026') || n.includes('kpi chi tiet 2026')) {
         const parsed=parseKPIBlocks(matrix,sheet);
         if (parsed.records.length) datasets.push({name:'KPI chuẩn hóa',records:parsed.records});
       }
@@ -811,7 +853,7 @@
 
   function detectWarnings(monthSheet, period) {
     const warnings=[];
-    const required=['Tháng 6.2026','TỔNG 2026','KPI CHI TIẾT 2026','Brand Awareness','ĐƠN HÀNG ONLINE + SP AFF','ĐƠN HÀNG SHOPEE','ĐƠN HÀNG TIKTOK'];
+    const required=[monthSheet,'TỔNG 2026','KPI CHI TIẾT 2026','Brand Awareness','ĐƠN HÀNG ONLINE + SP AFF','ĐƠN HÀNG SHOPEE','ĐƠN HÀNG TIKTOK'].filter(Boolean);
     for (const r of required) if (!findSheet(r)) warnings.push(`Không tìm thấy sheet ưu tiên: ${r}`);
     if (monthSheet) {
       const m=getMatrix(monthSheet,true);
@@ -857,10 +899,23 @@
 
   function buildDashboard() {
     destroyCharts();
-    const monthSheet = findSheet('Tháng 6.2026') || state.workbook.SheetNames.find(n=>/tháng\s*\d+\.\d{4}/i.test(n)) || state.workbook.SheetNames[0];
+    const monthSheet = state.primaryMonthSheet || selectPrimaryMonthSheet() || state.workbook.SheetNames[0];
+    state.primaryMonthSheet = monthSheet;
     const matrix=getMatrix(monthSheet,false);
     const parsed=parseKPIBlocks(matrix,monthSheet);
-    state.kpiRecords=parsed.records; state.kpiBrands=parsed.brands;
+
+    // The monthly workbook contains brand totals plus one final TOTAL block.
+    // Summing every block double-counts the same budget several times.
+    const grandTotal = [...parsed.brands].reverse().find(isGrandTotalBrand) || null;
+    const detailBrands = parsed.brands.filter(b => !isGrandTotalBrand(b));
+    const detailRecords = parsed.records.filter(r => !isGrandTotalBrand(r));
+    const grandTotalRecords = grandTotal
+      ? parsed.records.filter(r => norm(r.Brand) === norm(grandTotal.brand))
+      : [];
+
+    state.kpiRecords=parsed.records;
+    state.kpiBrands=detailBrands;
+    state.kpiGrandTotal=grandTotal;
 
     const awarenessSheet=findSheet('Brand Awareness');
     state.awarenessRecords=awarenessSheet?parseBrandAwareness(getMatrix(awarenessSheet,false),awarenessSheet):[];
@@ -872,40 +927,46 @@
     const display=getMatrix(monthSheet,true);
     const head=display.slice(0,8).flat().filter(Boolean).join(' ');
     const period=(head.match(/tháng\s*\d{1,2}[/.]\d{4}/i)||[monthSheet])[0];
-    $('periodText').textContent=`Nguồn chính: ${monthSheet} · Kỳ nhận diện: ${period}`;
+    $('periodText').textContent=`Nguồn chính: ${monthSheet} · Kỳ nhận diện: ${period}${grandTotal ? ' · Tổng ngân sách lấy từ dòng TOTAL cuối sheet' : ''}`;
 
-    const totalPlan=parsed.brands.reduce((s,b)=>s+(isNum(b.budgetPlan)?b.budgetPlan:0),0);
-    const totalSpend=parsed.brands.reduce((s,b)=>s+(isNum(b.actualSpend)?b.actualSpend:0),0);
-    const avgAch=parsed.brands.map(b=>b.avgAchievement).filter(isNum);
-    const meanAch=avgAch.length?avgAch.reduce((a,b)=>a+b,0)/avgAch.length:null;
-    const usage=totalPlan?totalSpend/totalPlan:null;
-    const kpiMet=parsed.records.filter(x=>isNum(x['Achievement %'])).filter(x=>x['Achievement %']>=1).length;
-    const kpiTotal=parsed.records.filter(x=>isNum(x['Achievement %'])).length;
+    const totalPlan = grandTotal?.budgetPlan
+      ?? detailBrands.reduce((s,b)=>s+(isNum(b.budgetPlan)?b.budgetPlan:0),0);
+    const totalSpend = grandTotal?.actualSpend
+      ?? detailBrands.reduce((s,b)=>s+(isNum(b.actualSpend)?b.actualSpend:0),0);
+    const avgAch=detailBrands.map(b=>b.avgAchievement).filter(isNum);
+    const fallbackMeanAch=avgAch.length?avgAch.reduce((a,b)=>a+b,0)/avgAch.length:null;
+    const meanAch=isNum(grandTotal?.totalAchievement) ? grandTotal.totalAchievement : fallbackMeanAch;
+    const usage=isNum(grandTotal?.budgetUsage)
+      ? grandTotal.budgetUsage
+      : (totalPlan?totalSpend/totalPlan:null);
+    const kpiMet=detailRecords.filter(x=>isNum(x['Achievement %'])&&x['Achievement %']>=1).length;
+    const kpiTotal=detailRecords.filter(x=>isNum(x['Achievement %'])).length;
     const errorCount=state.errors.length;
 
     const cards=[
-      {label:'Ngân sách thực tế',value:compact(totalSpend),note:`Kế hoạch ${compact(totalPlan)} · ${pct(usage)}`,class:usage>1.05?'bad':usage>.9?'good':'warn'},
-      {label:'KPI hoàn thành bình quân',value:pct(meanAch),note:`${kpiMet}/${kpiTotal} KPI đạt hoặc vượt 100%`,class:meanAch>=1?'good':meanAch>=.8?'warn':'bad'},
-      {label:'Thương hiệu / nhóm KPI',value:fmt(parsed.brands.length),note:`${fmt(parsed.records.length)} dòng KPI được chuẩn hóa`,class:''},
+      {label:'Ngân sách thực tế',value:compactMoney(totalSpend),note:`Kế hoạch ${compactMoney(totalPlan)} · ${pct(usage)}`,class:usage>1.05?'bad':usage>.9?'good':'warn'},
+      {label:grandTotal?'KPI tổng':'KPI hoàn thành bình quân',value:pct(meanAch),note:`${kpiMet}/${kpiTotal} KPI chi tiết đạt hoặc vượt 100%`,class:meanAch>=1?'good':meanAch>=.8?'warn':'bad'},
+      {label:'Thương hiệu / nhóm KPI',value:fmt(detailBrands.length),note:`${fmt(detailRecords.length)} dòng KPI chi tiết được chuẩn hóa`,class:''},
       {label:'Lỗi công thức nhận diện',value:fmt(errorCount),note:'Giới hạn hiển thị tối đa 300 lỗi',class:errorCount?'bad':'good'}
     ];
     $('metricCards').innerHTML=cards.map(c=>`<article class="metric-card ${c.class}"><div class="label">${escapeHtml(c.label)}</div><div class="value">${escapeHtml(c.value)}</div><div class="note">${escapeHtml(c.note)}</div></article>`).join('');
 
-    const top=parsed.brands.filter(b=>isNum(b.actualSpend)).sort((a,b)=>b.actualSpend-a.actualSpend).slice(0,12);
+    const top=detailBrands.filter(b=>isNum(b.actualSpend)).sort((a,b)=>b.actualSpend-a.actualSpend).slice(0,12);
     const colors=chartColors(.72);
     createChart('budgetChart','bar',{labels:top.map(x=>x.brand),datasets:[
       {label:'Kế hoạch',data:top.map(x=>x.budgetPlan),backgroundColor:'rgba(129,150,255,.42)',borderColor:'rgba(129,150,255,.9)',borderWidth:1},
       {label:'Thực tế',data:top.map(x=>x.actualSpend),backgroundColor:'rgba(88,217,238,.72)',borderColor:'rgba(88,217,238,1)',borderWidth:1}
     ]},{scales:{x:chartDefaults().scales.x,y:{...chartDefaults().scales.y,ticks:{...chartDefaults().scales.y.ticks,callback:v=>compact(v)}}}});
 
-    const topKpi=parsed.brands.filter(b=>isNum(b.avgAchievement)||isNum(b.budgetUsage)).sort((a,b)=>(b.actualSpend||0)-(a.actualSpend||0)).slice(0,12);
+    const topKpi=detailBrands.filter(b=>isNum(b.avgAchievement)||isNum(b.budgetUsage)).sort((a,b)=>(b.actualSpend||0)-(a.actualSpend||0)).slice(0,12);
     createChart('kpiChart','bar',{labels:topKpi.map(x=>x.brand),datasets:[
       {label:'KPI bình quân',data:topKpi.map(x=>isNum(x.avgAchievement)?x.avgAchievement*100:null),backgroundColor:'rgba(96,229,174,.70)'},
       {label:'Giải ngân',data:topKpi.map(x=>isNum(x.budgetUsage)?x.budgetUsage*100:null),backgroundColor:'rgba(255,200,107,.68)'}
     ]},{scales:{x:chartDefaults().scales.x,y:{...chartDefaults().scales.y,ticks:{...chartDefaults().scales.y.ticks,callback:v=>`${v}%`}}}});
 
     const channels={};
-    parsed.records.forEach(x=>{ if(isNum(x['Actual Spend'])&&x['Actual Spend']!==0) channels[x.Channel]=(channels[x.Channel]||0)+x['Actual Spend']; });
+    const channelSource = grandTotalRecords.length ? grandTotalRecords : detailRecords;
+    channelSource.forEach(x=>{ if(isNum(x['Actual Spend'])&&x['Actual Spend']!==0) channels[x.Channel]=(channels[x.Channel]||0)+x['Actual Spend']; });
     const channelEntries=Object.entries(channels).sort((a,b)=>b[1]-a[1]);
     createChart('channelChart','doughnut',{labels:channelEntries.map(x=>x[0]),datasets:[{data:channelEntries.map(x=>x[1]),backgroundColor:colors,borderWidth:0}]},{scales:{},plugins:{legend:{position:'bottom',labels:{color:getComputedStyle(document.documentElement).getPropertyValue('--muted').trim(),usePointStyle:true,boxWidth:8}},tooltip:{callbacks:{label:c=>`${c.label}: ${fmt(c.raw)} VND`}}}});
 
@@ -1098,14 +1159,15 @@
 
   async function loadFile(file) {
     if(!window.XLSX){alert('Không tải được thư viện SheetJS. Vui lòng kiểm tra kết nối Internet và tải lại trang.');return;}
-    state.file=file; state.matrixCache.clear(); state.displayCache.clear(); state.pivotDatasets.clear(); destroyCharts();
+    state.file=file; state.primaryMonthSheet=null; state.kpiGrandTotal=null; state.matrixCache.clear(); state.displayCache.clear(); state.pivotDatasets.clear(); destroyCharts();
     showLoading('Đang đọc workbook…',`Đang xử lý ${file.name}. File lớn có thể mất từ vài giây đến khoảng một phút.`);
     await new Promise(r=>setTimeout(r,40));
     try {
       const buffer=await file.arrayBuffer();
       state.workbook=XLSX.read(buffer,{type:'array',cellDates:true,cellFormula:true,cellNF:true,cellStyles:false});
       scanWorkbookQuality();
-      const monthSheet=findSheet('Tháng 6.2026')||state.workbook.SheetNames.find(n=>/tháng\s*\d+\.\d{4}/i.test(n));
+      state.primaryMonthSheet=selectPrimaryMonthSheet();
+      const monthSheet=state.primaryMonthSheet;
       detectWarnings(monthSheet,'');
       buildDashboard(); setupPivot(); setupSheetBrowser(); renderQuality();
       $('fileName').textContent=file.name;
