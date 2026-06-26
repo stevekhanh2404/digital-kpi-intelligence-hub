@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Digital KPI Intelligence Hub - nhập báo cáo Excel và tự động tạo dashboard, đánh giá KPI, báo cáo chi tiết và Pivot Table ngay trên trình duyệt." />
+  <meta name="color-scheme" content="dark light" />
+  <title>Digital KPI Intelligence Hub | Steve Khanh</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%2355dcf4'/%3E%3Cstop offset='1' stop-color='%23748dff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='17' fill='url(%23g)'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial,sans-serif' font-size='25' font-weight='800' fill='%2306111e'%3ESK%3C/text%3E%3C/svg%3E" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #07101d;
+      --bg-elev: #0c1726;
+      --surface: rgba(15, 29, 47, .82);
+      --surface-solid: #101d2e;
+      --surface-2: #15263a;
+      --text: #edf7ff;
+      --muted: #94a8ba;
+      --line: rgba(149, 183, 211, .18);
+      --primary: #58d9ee;
+      --primary-2: #8196ff;
+      --green: #60e5ae;
+      --amber: #ffc86b;
+      --red: #ff7f8f;
+      --shadow: 0 24px 70px rgba(0, 0, 0, .26);
+      --radius: 22px;
+      --radius-sm: 14px;
+      --header: rgba(7, 16, 29, .84);
+    }
+
+    html[data-theme="light"] {
+      --bg: #f4f7fb;
+      --bg-elev: #ffffff;
+      --surface: rgba(255, 255, 255, .94);
+      --surface-solid: #ffffff;
+      --surface-2: #edf3f8;
+      --text: #13283a;
+      --muted: #5f7384;
+      --line: rgba(33, 69, 93, .15);
+      --primary: #087f96;
+      --primary-2: #415fc7;
+      --green: #087a55;
+      --amber: #9b5b00;
+      --red: #b83248;
+      --shadow: 0 24px 70px rgba(40, 74, 99, .14);
+      --header: rgba(244, 247, 251, .92);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 0%, rgba(88, 217, 238, .12), transparent 34%),
+        radial-gradient(circle at 94% 3%, rgba(129, 150, 255, .11), transparent 32%),
+        var(--bg);
+      line-height: 1.55;
+    }
+
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      padding: 14px max(22px, calc((100vw - 1440px) / 2));
+      border-bottom: 1px solid var(--line);
+      background: var(--header);
+      backdrop-filter: blur(14px);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      width: 38px; height: 38px; border-radius: 12px;
+      display: grid; place-items: center;
+      font-weight: 900; letter-spacing: -.04em; color: #06111e;
+      background: linear-gradient(135deg, #55dcf4, #748dff);
+      box-shadow: 0 8px 24px rgba(88, 217, 238, .2);
+      flex: 0 0 auto;
+    }
+    .brand-copy { min-width: 0; }
+    .brand-copy strong { display: block; font-size: .98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .brand-copy span { display: block; color: var(--muted); font-size: .76rem; }
+
+    .top-actions { display: flex; gap: 8px; align-items: center; }
+    .icon-btn, .btn {
+      border: 1px solid var(--line);
+      color: var(--text);
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 10px 13px;
+      font-weight: 700;
+      transition: .2s ease;
+    }
+    .icon-btn:hover, .btn:hover { transform: translateY(-1px); border-color: rgba(88,217,238,.45); }
+    .btn.primary {
+      border-color: transparent;
+      color: #06111e;
+      background: linear-gradient(135deg, #55dcf4, #748dff);
+    }
+    .btn.ghost { background: transparent; }
+    .btn.small { padding: 8px 11px; font-size: .83rem; }
+
+    .shell { width: min(1440px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 70px; }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(330px, .65fr);
+      gap: 28px;
+      align-items: stretch;
+      margin-bottom: 26px;
+    }
+    .hero-copy, .upload-panel, .panel, .metric-card, .chart-card, .insight-card {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+    }
+    .hero-copy { padding: clamp(28px, 5vw, 58px); position: relative; overflow: hidden; }
+    .hero-copy::after {
+      content: ""; position: absolute; width: 280px; height: 280px; border-radius: 50%;
+      right: -110px; top: -130px; background: rgba(88,217,238,.10); filter: blur(8px); pointer-events: none;
+    }
+    .eyebrow { color: var(--primary); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; font-size: .74rem; }
+    h1 { margin: 12px 0 16px; font-size: clamp(2.15rem, 5vw, 4.65rem); line-height: 1.02; letter-spacing: -.055em; max-width: 900px; }
+    .gradient-text { background: linear-gradient(135deg, var(--primary), var(--primary-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero-copy p { color: var(--muted); max-width: 790px; font-size: 1.03rem; margin: 0; }
+    .hero-features { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .chip { padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: .79rem; background: rgba(88,217,238,.045); }
+
+    .upload-panel { padding: 22px; display: flex; flex-direction: column; }
+    .upload-panel h2 { margin: 0 0 5px; font-size: 1.15rem; }
+    .upload-panel > p { color: var(--muted); font-size: .86rem; margin: 0 0 15px; }
+    .dropzone {
+      flex: 1; min-height: 230px; display: grid; place-items: center; text-align: center;
+      border: 1.5px dashed rgba(88,217,238,.45); border-radius: 17px; padding: 24px;
+      background: linear-gradient(145deg, rgba(88,217,238,.07), rgba(129,150,255,.05));
+      transition: .2s ease;
+    }
+    .dropzone.drag { border-color: var(--primary); transform: translateY(-2px); background: rgba(88,217,238,.12); }
+    .drop-icon { font-size: 2rem; margin-bottom: 8px; }
+    .dropzone strong { display: block; margin-bottom: 5px; }
+    .dropzone small { color: var(--muted); display: block; margin-bottom: 16px; }
+    #fileInput { display: none; }
+    .privacy { margin-top: 13px; color: var(--muted); font-size: .76rem; }
+    .privacy b { color: var(--green); }
+
+    .file-status {
+      display: none; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 13px 16px; margin-bottom: 18px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface);
+    }
+    .file-status.show { display: flex; }
+    .file-meta strong { display: block; }
+    .file-meta span { color: var(--muted); font-size: .8rem; }
+    .status-pill { border-radius: 999px; padding: 7px 10px; font-size: .76rem; font-weight: 800; color: var(--green); background: rgba(96,229,174,.1); border: 1px solid rgba(96,229,174,.22); }
+
+    .workspace { display: none; }
+    .workspace.show { display: block; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+    .tab-btn { border: 1px solid var(--line); background: var(--surface); color: var(--muted); padding: 10px 14px; border-radius: 999px; font-weight: 800; }
+    .tab-btn.active { color: #06111e; border-color: transparent; background: linear-gradient(135deg,#55dcf4,#748dff); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    .section-head { display: flex; justify-content: space-between; align-items: end; gap: 18px; margin: 25px 2px 14px; }
+    .section-head h2 { margin: 0; letter-spacing: -.025em; }
+    .section-head p { margin: 3px 0 0; color: var(--muted); font-size: .86rem; }
+
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+    .metric-card { padding: 18px; box-shadow: none; }
+    .metric-card .label { color: var(--muted); font-size: .78rem; }
+    .metric-card .value { margin-top: 4px; font-size: clamp(1.4rem, 2.8vw, 2.2rem); font-weight: 900; letter-spacing: -.04em; }
+    .metric-card .note { color: var(--muted); font-size: .74rem; margin-top: 4px; }
+    .metric-card.good .value { color: var(--green); }
+    .metric-card.warn .value { color: var(--amber); }
+    .metric-card.bad .value { color: var(--red); }
+
+    .charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 15px; }
+    .chart-card { padding: 18px; box-shadow: none; min-height: 380px; }
+    .chart-card.wide { grid-column: 1 / -1; }
+    .chart-title { display: flex; justify-content: space-between; gap: 15px; align-items: start; margin-bottom: 14px; }
+    .chart-title h3 { margin: 0; font-size: 1rem; }
+    .chart-title p { color: var(--muted); font-size: .75rem; margin: 3px 0 0; }
+    .chart-box { height: 300px; position: relative; }
+    .wide .chart-box { height: 340px; }
+
+    .insights-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 13px; }
+    .insight-card { padding: 18px; box-shadow: none; }
+    .insight-card h3 { margin: 0 0 10px; font-size: .95rem; }
+    .insight-card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: .84rem; }
+    .insight-card li + li { margin-top: 7px; }
+    .insight-card.good h3 { color: var(--green); }
+    .insight-card.warn h3 { color: var(--amber); }
+    .insight-card.bad h3 { color: var(--red); }
+
+    .panel { padding: 19px; box-shadow: none; }
+    .controls { display: grid; grid-template-columns: repeat(6, minmax(130px,1fr)); gap: 10px; align-items: end; }
+    .control label { display: block; color: var(--muted); font-size: .72rem; margin-bottom: 5px; font-weight: 700; }
+    .control select, .control input {
+      width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px; color: var(--text); background: var(--surface-solid); outline: none;
+    }
+    .control select:focus, .control input:focus { border-color: var(--primary); }
+    .control.actions { display: flex; gap: 7px; }
+
+    .dataset-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 13px 0; color: var(--muted); font-size: .76rem; }
+    .dataset-meta span { border: 1px solid var(--line); border-radius: 999px; padding: 6px 9px; }
+
+    .table-toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin: 12px 0 9px; }
+    .table-toolbar input { min-width: 260px; max-width: 450px; width: 42%; border: 1px solid var(--line); background: var(--surface-solid); color: var(--text); border-radius: 10px; padding: 9px 11px; }
+    .table-wrap { overflow: auto; max-height: 68vh; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-solid); }
+    table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: .78rem; }
+    th, td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 8px 10px; max-width: 320px; min-width: 110px; vertical-align: top; white-space: pre-wrap; word-break: break-word; }
+    th { position: sticky; top: 0; z-index: 3; text-align: left; background: var(--surface-2); color: var(--text); font-weight: 800; }
+    th:first-child, td:first-child { position: sticky; left: 0; z-index: 2; background: var(--surface-solid); }
+    th:first-child { z-index: 4; background: var(--surface-2); }
+    tr:hover td { background: rgba(88,217,238,.035); }
+    td.number { text-align: right; font-variant-numeric: tabular-nums; }
+    td.error { color: var(--red); font-weight: 800; }
+    .pivot-total td { font-weight: 900; background: rgba(88,217,238,.06); }
+
+    .pagination { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-top: 10px; color: var(--muted); font-size: .78rem; }
+    .page-actions { display: flex; gap: 6px; }
+
+    .sheet-grid { display: grid; grid-template-columns: 300px minmax(0,1fr); gap: 14px; }
+    .sheet-list { max-height: 72vh; overflow: auto; border: 1px solid var(--line); border-radius: 14px; padding: 7px; background: var(--surface-solid); }
+    .sheet-item { width: 100%; text-align: left; border: 0; color: var(--text); background: transparent; border-radius: 10px; padding: 10px; display: flex; justify-content: space-between; gap: 10px; }
+    .sheet-item:hover, .sheet-item.active { background: rgba(88,217,238,.09); }
+    .sheet-item small { color: var(--muted); }
+
+    .quality-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+    .quality-list { margin: 0; padding: 0; list-style: none; }
+    .quality-list li { padding: 10px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: .84rem; }
+    .quality-list li:last-child { border-bottom: 0; }
+    .quality-list b { color: var(--text); }
+
+    .loading-overlay {
+      position: fixed; inset: 0; z-index: 100; display: none; place-items: center;
+      background: rgba(4, 10, 18, .76); backdrop-filter: blur(7px);
+    }
+    .loading-overlay.show { display: grid; }
+    .loader-card { min-width: min(420px, calc(100vw - 36px)); padding: 24px; border-radius: 20px; background: var(--surface-solid); border: 1px solid var(--line); text-align: center; box-shadow: var(--shadow); }
+    .spinner { width: 42px; height: 42px; border: 4px solid var(--line); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 13px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-card p { color: var(--muted); margin: 4px 0 0; font-size: .84rem; }
+
+    .empty { border: 1px dashed var(--line); border-radius: 14px; padding: 32px; text-align: center; color: var(--muted); }
+    .notice { padding: 11px 13px; border-radius: 12px; font-size: .8rem; color: var(--muted); background: rgba(255,200,107,.08); border: 1px solid rgba(255,200,107,.22); }
+    .notice b { color: var(--amber); }
+    footer { color: var(--muted); text-align: center; font-size: .76rem; padding-top: 38px; }
+
+    @media (max-width: 1100px) {
+      .hero { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2,1fr); }
+      .controls { grid-template-columns: repeat(3,1fr); }
+      .insights-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 780px) {
+      .shell { width: min(100% - 20px, 1440px); padding-top: 18px; }
+      .topbar { padding: 11px 12px; }
+      .brand-copy span { display: none; }
+      .hero-copy, .upload-panel { border-radius: 17px; }
+      .charts-grid { grid-template-columns: 1fr; }
+      .chart-card.wide { grid-column: auto; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .controls { grid-template-columns: 1fr 1fr; }
+      .sheet-grid, .quality-grid { grid-template-columns: 1fr; }
+      .sheet-list { max-height: 260px; }
+      .table-toolbar { align-items: stretch; flex-direction: column; }
+      .table-toolbar input { width: 100%; max-width: none; min-width: 0; }
+    }
+    @media (max-width: 480px) {
+      h1 { font-size: 2.2rem; }
+      .metrics, .controls { grid-template-columns: 1fr; }
+      .top-actions .text-label { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">SK</div>
+      <div class="brand-copy"><strong>Digital KPI Intelligence Hub</strong><span>Excel → Dashboard → Insight → Pivot Table</span></div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="themeBtn" title="Đổi giao diện">☀︎ <span class="text-label">Light</span></button>
+      <button class="icon-btn" id="printBtn" title="In / lưu PDF">⤓ <span class="text-label">PDF</span></button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">Client-side marketing analytics</div>
+        <h1>Biến báo cáo Excel thành <span class="gradient-text">dashboard quản trị</span> trong vài giây.</h1>
+        <p>Nhập file KPI Digital để tự động tổng hợp ngân sách, mức hoàn thành KPI, hiệu quả theo thương hiệu và kênh, đánh giá dữ liệu, báo cáo thương mại điện tử cùng hệ thống Pivot Table tương tác.</p>
+        <div class="hero-features">
+          <span class="chip">Không tải dữ liệu lên máy chủ</span>
+          <span class="chip">Dashboard tự động</span>
+          <span class="chip">KPI & ngân sách</span>
+          <span class="chip">Brand Awareness</span>
+          <span class="chip">E-commerce</span>
+          <span class="chip">Pivot Table</span>
+        </div>
+      </div>
+
+      <aside class="upload-panel">
+        <h2>Nhập báo cáo Excel</h2>
+        <p>Hỗ trợ định dạng .xlsx, .xls và .xlsm có cấu trúc tương tự file mẫu.</p>
+        <div class="dropzone" id="dropzone">
+          <div>
+            <div class="drop-icon">⇧</div>
+            <strong>Kéo thả file vào đây</strong>
+            <small>hoặc chọn file từ máy tính</small>
+            <button class="btn primary" id="chooseBtn">Chọn file Excel</button>
+            <input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm" />
+          </div>
+        </div>
+        <div class="privacy"><b>Riêng tư:</b> toàn bộ dữ liệu được xử lý ngay trong trình duyệt và không được gửi lên server.</div>
+      </aside>
+    </section>
+
+    <div class="file-status" id="fileStatus">
+      <div class="file-meta"><strong id="fileName">—</strong><span id="fileDetail">—</span></div>
+      <span class="status-pill" id="statusPill">Đã phân tích</span>
+    </div>
+
+    <section class="workspace" id="workspace">
+      <nav class="tabs" aria-label="Chức năng">
+        <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+        <button class="tab-btn" data-tab="insights">Đánh giá KPI</button>
+        <button class="tab-btn" data-tab="pivot">Pivot Table</button>
+        <button class="tab-btn" data-tab="sheets">Chi tiết Sheet</button>
+        <button class="tab-btn" data-tab="quality">Chất lượng dữ liệu</button>
+      </nav>
+
+      <div class="tab-pane active" id="tab-dashboard">
+        <div class="section-head">
+          <div><h2>Tổng quan điều hành</h2><p id="periodText">Tổng hợp từ báo cáo vừa nhập.</p></div>
+          <button class="btn small" id="refreshBtn">Làm mới dashboard</button>
+        </div>
+        <div class="metrics" id="metricCards"></div>
+
+        <div class="section-head"><div><h2>Hiệu suất KPI và ngân sách</h2><p>Được chuẩn hóa từ các block thương hiệu trong sheet báo cáo tháng.</p></div></div>
+        <div class="charts-grid">
+          <article class="chart-card"><div class="chart-title"><div><h3>Ngân sách kế hoạch và thực tế</h3><p>Top thương hiệu theo ngân sách thực tế.</p></div></div><div class="chart-box"><canvas id="budgetChart"></canvas></div></article>
+          <article class="chart-card"><div class="chart-title"><div><h3>KPI hoàn thành và tỷ lệ giải ngân</h3><p>So sánh tốc độ kết quả với tốc độ sử dụng ngân sách.</p></div></div><div class="chart-box"><canvas id="kpiChart"></canvas></div></article>
+          <article class="chart-card"><div class="chart-title"><div><h3>Cơ cấu chi tiêu theo kênh</h3><p>Tổng ngân sách thực tế được ghi nhận theo từng kênh.</p></div></div><div class="chart-box"><canvas id="channelChart"></canvas></div></article>
+          <article class="chart-card"><div class="chart-title"><div><h3>Brand Awareness đa nền tảng</h3><p>Reach theo thương hiệu trên Facebook, Google và TikTok.</p></div></div><div class="chart-box"><canvas id="awarenessChart"></canvas></div></article>
+          <article class="chart-card wide"><div class="chart-title"><div><h3>Doanh thu TikTok theo ngày</h3><p>Được nhận diện tự động từ bảng doanh thu/GMV trong sheet TikTok.</p></div></div><div class="chart-box"><canvas id="tiktokTrendChart"></canvas></div></article>
+          <article class="chart-card wide"><div class="chart-title"><div><h3>Xu hướng Shopee theo tháng</h3><p>Ngân sách, doanh số và chi phí ước tính trên đơn hàng từ sheet Shopee.</p></div></div><div class="chart-box"><canvas id="shopeeTrendChart"></canvas></div></article>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="tab-insights">
+        <div class="section-head"><div><h2>Đánh giá và khuyến nghị tự động</h2><p>Nhận định theo quy tắc từ tỷ lệ KPI, ngân sách, hiệu quả chi phí và dữ liệu nhận diện thương hiệu.</p></div></div>
+        <div class="notice"><b>Lưu ý:</b> đây là đánh giá hỗ trợ ra quyết định. Kết luận cuối cùng vẫn cần đặt trong bối cảnh chiến dịch, mùa vụ, thay đổi giá bán, nguồn hàng và chất lượng vận hành Sales.</div>
+        <div class="insights-grid" id="insightsGrid" style="margin-top:14px"></div>
+        <div class="section-head"><div><h2>Bảng KPI chuẩn hóa</h2><p>Mỗi dòng là một KPI theo thương hiệu, kênh và chỉ số.</p></div></div>
+        <div class="panel">
+          <div class="table-toolbar"><input id="kpiSearch" placeholder="Tìm thương hiệu, kênh hoặc KPI…" /><button class="btn small" id="exportKpiBtn">Xuất CSV</button></div>
+          <div class="table-wrap" id="kpiTableWrap"></div>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="tab-pivot">
+        <div class="section-head"><div><h2>Pivot Table Explorer</h2><p>Các sheet ưu tiên được chuyển thành dataset chuẩn hóa; vẫn có thể xem bảng thô và tự chọn phép tổng hợp.</p></div></div>
+        <div class="panel">
+          <div class="controls">
+            <div class="control"><label>Sheet</label><select id="pivotSheet"></select></div>
+            <div class="control"><label>Dataset / vùng dữ liệu</label><select id="pivotDataset"></select></div>
+            <div class="control"><label>Hàng (Rows)</label><select id="pivotRow"></select></div>
+            <div class="control"><label>Cột (Columns)</label><select id="pivotCol"></select></div>
+            <div class="control"><label>Giá trị (Values)</label><select id="pivotValue"></select></div>
+            <div class="control"><label>Phép tính</label><select id="pivotAgg"><option value="sum">Tổng</option><option value="avg">Trung bình</option><option value="count">Đếm</option><option value="min">Nhỏ nhất</option><option value="max">Lớn nhất</option></select></div>
+          </div>
+          <div class="dataset-meta" id="datasetMeta"></div>
+          <div class="table-toolbar">
+            <input id="pivotSearch" placeholder="Lọc nhanh dữ liệu hiển thị…" />
+            <div><button class="btn small primary" id="buildPivotBtn">Tạo Pivot</button> <button class="btn small" id="showRawBtn">Xem dữ liệu gốc</button> <button class="btn small" id="exportPivotBtn">Xuất CSV</button></div>
+          </div>
+          <div class="table-wrap" id="pivotTableWrap"></div>
+          <div class="pagination" id="pivotPagination"></div>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="tab-sheets">
+        <div class="section-head"><div><h2>Trình duyệt Sheet</h2><p>Xem nhanh mọi sheet trong workbook, kể cả sheet ẩn và vùng dữ liệu lớn.</p></div></div>
+        <div class="sheet-grid">
+          <div class="sheet-list" id="sheetList"></div>
+          <div class="panel">
+            <div class="table-toolbar"><input id="sheetSearch" placeholder="Tìm trong sheet đang mở…" /><div><button class="btn small" id="prevSheetPage">←</button> <button class="btn small" id="nextSheetPage">→</button></div></div>
+            <div class="dataset-meta" id="sheetMeta"></div>
+            <div class="table-wrap" id="sheetTableWrap"></div>
+            <div class="pagination" id="sheetPagination"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="tab-quality">
+        <div class="section-head"><div><h2>Kiểm tra chất lượng dữ liệu</h2><p>Phát hiện lỗi công thức, sheet thiếu, chênh lệch tiêu đề và quy mô dữ liệu.</p></div></div>
+        <div class="quality-grid">
+          <div class="panel"><h3>Tổng quan workbook</h3><ul class="quality-list" id="qualitySummary"></ul></div>
+          <div class="panel"><h3>Cảnh báo cần kiểm tra</h3><ul class="quality-list" id="qualityWarnings"></ul></div>
+        </div>
+        <div class="section-head"><div><h2>Chi tiết lỗi công thức</h2><p>Hiển thị tối đa 300 ô lỗi để tránh làm trình duyệt quá tải.</p></div></div>
+        <div class="panel"><div class="table-wrap" id="errorTableWrap"></div></div>
+      </div>
+    </section>
+
+    <footer>Built for data-driven Digital Marketing operations · Steve Khanh · Dữ liệu được xử lý cục bộ trong trình duyệt.</footer>
+  </main>
+
+  <div class="loading-overlay" id="loading"><div class="loader-card"><div class="spinner"></div><strong id="loadingTitle">Đang đọc workbook…</strong><p id="loadingText">Vui lòng chờ trong khi hệ thống chuẩn hóa dữ liệu và dựng dashboard.</p></div></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const state = {
+    file: null,
+    workbook: null,
+    charts: {},
+    matrixCache: new Map(),
+    displayCache: new Map(),
+    kpiRecords: [],
+    kpiBrands: [],
+    awarenessRecords: [],
+    tiktokDaily: [],
+    shopeeMonthly: [],
+    errors: [],
+    warnings: [],
+    pivotDatasets: new Map(),
+    currentPivotRecords: [],
+    currentPivotMatrix: null,
+    pivotMode: 'pivot',
+    pivotPage: 1,
+    pivotPageSize: 100,
+    currentSheet: null,
+    sheetPage: 1,
+    sheetPageSize: 120
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const norm = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/đ/g,'d').replace(/\s+/g,' ').trim();
+  const cleanText = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+  const num = (v) => {
+    if (isNum(v)) return v;
+    if (typeof v === 'string') {
+      const s = v.replace(/[%₫,$\s]/g,'').replace(/,/g,'');
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  };
+  const pct = (v, digits=1) => isNum(v) ? `${(v*100).toFixed(digits)}%` : '—';
+  const fmt = (v, digits=0) => {
+    if (!isNum(v)) return v === 0 ? '0' : '—';
+    return new Intl.NumberFormat('vi-VN', {maximumFractionDigits: digits}).format(v);
+  };
+  const compact = (v) => {
+    if (!isNum(v)) return '—';
+    const a = Math.abs(v);
+    if (a >= 1e9) return `${(v/1e9).toFixed(a >= 1e10 ? 1 : 2)}B`;
+    if (a >= 1e6) return `${(v/1e6).toFixed(a >= 1e8 ? 0 : 1)}M`;
+    if (a >= 1e3) return `${(v/1e3).toFixed(a >= 1e5 ? 0 : 1)}K`;
+    return fmt(v, 1);
+  };
+  const formatValue = (v, field='') => {
+    if (v === null || v === undefined || v === '') return '';
+    if (v instanceof Date) return v.toLocaleDateString('vi-VN');
+    if (typeof v === 'number') {
+      const f = norm(field);
+      if (f.includes('%') || f.includes('ty le') || f.includes('achievement') || f.includes('usage') || f.includes('awareness')) return pct(v);
+      return fmt(v, Math.abs(v) < 100 && !Number.isInteger(v) ? 2 : 0);
+    }
+    return String(v);
+  };
+  const escapeHtml = (s) => String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const excelDate = (v) => {
+    if (v instanceof Date) return v;
+    if (typeof v === 'number' && v > 25000 && v < 80000 && window.XLSX) {
+      const d = XLSX.SSF.parse_date_code(v);
+      if (d) return new Date(d.y, d.m - 1, d.d);
+    }
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return new Date(v);
+    return null;
+  };
+  const fileSize = (bytes) => bytes > 1024*1024 ? `${(bytes/1024/1024).toFixed(1)} MB` : `${Math.round(bytes/1024)} KB`;
+
+  function showLoading(title='Đang đọc workbook…', text='Vui lòng chờ trong khi hệ thống chuẩn hóa dữ liệu và dựng dashboard.') {
+    $('loadingTitle').textContent = title; $('loadingText').textContent = text; $('loading').classList.add('show');
+  }
+  function hideLoading() { $('loading').classList.remove('show'); }
+
+  function findSheet(candidates) {
+    if (!state.workbook) return null;
+    const names = state.workbook.SheetNames;
+    const cs = (Array.isArray(candidates) ? candidates : [candidates]).map(norm);
+    for (const c of cs) {
+      const exact = names.find(n => norm(n) === c);
+      if (exact) return exact;
+    }
+    for (const c of cs) {
+      const partial = names.find(n => norm(n).includes(c) || c.includes(norm(n)));
+      if (partial) return partial;
+    }
+    return null;
+  }
+
+  function getMatrix(sheetName, display=false) {
+    const cache = display ? state.displayCache : state.matrixCache;
+    if (cache.has(sheetName)) return cache.get(sheetName);
+    const ws = state.workbook.Sheets[sheetName];
+    const matrix = XLSX.utils.sheet_to_json(ws, {
+      header: 1,
+      raw: !display,
+      defval: null,
+      blankrows: true,
+      cellDates: true
+    });
+    cache.set(sheetName, matrix);
+    return matrix;
+  }
+
+  function sheetStats(name) {
+    const ws = state.workbook.Sheets[name];
+    const ref = ws && ws['!ref'];
+    if (!ref) return {rows:0, cols:0, ref:'—'};
+    const range = XLSX.utils.decode_range(ref);
+    return {rows:range.e.r-range.s.r+1, cols:range.e.c-range.s.c+1, ref};
+  }
+
+  function parseKPIBlocks(matrix, sourceSheet='') {
+    const records = [], brands = [];
+    let r = 0;
+    while (r < matrix.length) {
+      const row = matrix[r] || [];
+      const nD = norm(row[3]), nE = norm(row[4]), nG = norm(row[6]), nH = norm(row[7]);
+      const isHeader = nD.includes('kpi') && nE.includes('thuc hien') && nG.includes('ngan sach') && (nH.includes('ns thuc te') || nH.includes('thuc te'));
+      if (!isHeader) { r++; continue; }
+      const brand = cleanText(row[0] || row[1] || `Nhóm KPI ${brands.length+1}`);
+      let channel = '';
+      const metrics = [];
+      let total = null;
+      let rr = r + 1;
+      for (; rr < matrix.length; rr++) {
+        const x = matrix[rr] || [];
+        const b = cleanText(x[1]);
+        if (norm(b) === 'total' || norm(b) === 'tong') {
+          total = {
+            target: num(x[3]), actual: num(x[4]), totalAchievement: num(x[5]),
+            budgetPlan: num(x[6]), actualSpend: num(x[7]), budgetUsage: num(x[8])
+          };
+          break;
+        }
+        if (rr > r+1 && norm(x[3]).includes('kpi') && norm(x[4]).includes('thuc hien')) break;
+        if (b) channel = b;
+        const metric = cleanText(x[2]);
+        const target = num(x[3]), actual = num(x[4]);
+        const achievement = num(x[5]) ?? (target ? actual/target : null);
+        const budgetPlan = num(x[6]), actualSpend = num(x[7]);
+        const budgetUsage = num(x[8]) ?? (budgetPlan ? actualSpend/budgetPlan : null);
+        const unitActual = num(x[12]), unitPlan = num(x[13]);
+        if (metric || target !== null || actual !== null || budgetPlan !== null || actualSpend !== null) {
+          const rec = {
+            Sheet: sourceSheet, Brand: brand, Channel: channel || 'Khác', KPI: metric || '—',
+            Target: target, Actual: actual, 'Achievement %': achievement,
+            'Planned Budget': budgetPlan, 'Actual Spend': actualSpend, 'Budget Usage %': budgetUsage,
+            'Actual Unit Cost': unitActual, 'Planned Unit Cost': unitPlan
+          };
+          metrics.push(rec); records.push(rec);
+        }
+      }
+      const ach = metrics.map(x => x['Achievement %']).filter(isNum);
+      const met = ach.filter(x => x >= 1).length;
+      const avgAch = ach.length ? ach.reduce((a,b)=>a+b,0)/ach.length : null;
+      const derivedBudgetPlan = metrics.reduce((s,x)=>s+(isNum(x['Planned Budget'])?x['Planned Budget']:0),0);
+      const derivedSpend = metrics.reduce((s,x)=>s+(isNum(x['Actual Spend'])?x['Actual Spend']:0),0);
+      const budgetPlan = total?.budgetPlan ?? derivedBudgetPlan;
+      const actualSpend = total?.actualSpend ?? derivedSpend;
+      const budgetUsage = total?.budgetUsage ?? (budgetPlan ? actualSpend/budgetPlan : null);
+      if (metrics.length) brands.push({
+        brand, sourceSheet, metrics: metrics.length, met, avgAchievement: avgAch,
+        totalAchievement: total?.totalAchievement, budgetPlan, actualSpend, budgetUsage,
+        efficiency: isNum(avgAch) && isNum(budgetUsage) && budgetUsage !== 0 ? avgAch/budgetUsage : null
+      });
+      r = Math.max(rr + 1, r + 1);
+    }
+    return {records, brands};
+  }
+
+  function parseBrandAwareness(matrix, sourceSheet='') {
+    const records = [];
+    let platform = '';
+    for (let r=0; r<matrix.length; r++) {
+      const row = matrix[r] || [];
+      if (norm(row[0]).startsWith('thang') && cleanText(row[1])) {
+        platform = cleanText(row[1]);
+        continue;
+      }
+      if (!platform) continue;
+      const brand = cleanText(row[1]);
+      if (!brand || /facebook|google|tiktok/i.test(brand)) continue;
+      const reach = num(row[2]);
+      const impressions = num(row[3]);
+      if (reach === null && impressions === null) continue;
+      const frequency = num(row[4]);
+      const engagement = num(row[5]);
+      const newReach = num(row[6]);
+      const audience = num(row[7]);
+      let awareness = null;
+      for (let c=8; c<=10; c++) {
+        const candidate = num(row[c]);
+        if (candidate !== null && Math.abs(candidate) <= 1.5) awareness = candidate;
+      }
+      records.push({
+        Sheet:sourceSheet, Platform:platform, Brand:brand, Reach:reach, Impressions:impressions,
+        Frequency:frequency, Engagement:engagement, 'New Reach':newReach, 'Audience Size':audience,
+        'Awareness Lift %':awareness, Age:cleanText(row[8]), Evaluation:cleanText(row[10] || row[9])
+      });
+    }
+    return records;
+  }
+
+  function parseTikTokDaily(matrix, sourceSheet='') {
+    let header = -1;
+    for (let r=0; r<Math.min(matrix.length,80); r++) {
+      const rowNorm = (matrix[r]||[]).map(norm);
+      if (rowNorm.some(x=>x.includes('gmv')) && rowNorm.some(x=>x.includes('don hang'))) { header=r; break; }
+    }
+    if (header < 0) return [];
+    const out=[];
+    for (let r=header+1; r<matrix.length; r++) {
+      const row=matrix[r]||[];
+      if (norm(row[0])==='tong') break;
+      const d=excelDate(row[0]);
+      if (!d) continue;
+      out.push({
+        Sheet:sourceSheet, Date:d, GMV:num(row[1]), 'Product Viewers':num(row[2]), 'Product Clicks':num(row[3]),
+        'Add to Cart':num(row[4]), Orders:num(row[5]), Buyers:num(row[6])
+      });
+    }
+    return out;
+  }
+
+  function parseShopeeMonthly(matrix, sourceSheet='') {
+    if (matrix.length < 4) return [];
+    const months=[];
+    const monthRowIndex = matrix.findIndex(row => (row||[]).filter(v=>/^tháng\s*\d+/i.test(cleanText(v))).length >= 2);
+    if (monthRowIndex < 0) return [];
+    const monthRow = matrix[monthRowIndex] || [];
+    const headerRow = matrix[monthRowIndex+1] || [];
+    const starts=[];
+    monthRow.forEach((v,i)=>{ if (/^tháng\s*\d+/i.test(cleanText(v))) starts.push({i, month:cleanText(v)}); });
+    for (const block of starts) {
+      const start=block.i;
+      let totalRow=null;
+      for (let r=monthRowIndex+2; r<Math.min(matrix.length, monthRowIndex+25); r++) {
+        if (norm((matrix[r]||[])[start]) === 'tong') { totalRow=matrix[r]||[]; break; }
+      }
+      if (!totalRow) continue;
+      months.push({
+        Sheet:sourceSheet, Month:block.month,
+        'Ad Spend':num(totalRow[start+1]), Buyers:num(totalRow[start+2]), Orders:num(totalRow[start+3]),
+        Revenue:num(totalRow[start+4]), 'Cost per Order':num(totalRow[start+5]),
+        'Estimated Digital Revenue':isNum(num(totalRow[start+4])) ? num(totalRow[start+4])*.5 : null
+      });
+    }
+    return months;
+  }
+
+  function uniqueHeaders(row) {
+    const used = new Map();
+    return row.map((v,i) => {
+      let h=cleanText(v) || `Column ${XLSX.utils.encode_col(i)}`;
+      const n=(used.get(h)||0)+1; used.set(h,n);
+      return n>1 ? `${h} (${n})` : h;
+    });
+  }
+
+  function autoDetectBlocks(matrix, sheetName='') {
+    const blocks=[];
+    const maxRows=Math.min(matrix.length, norm(sheetName).includes('don hang online') ? matrix.length : 3000);
+    for (let r=0; r<maxRows; r++) {
+      const row=matrix[r]||[];
+      const non=row.filter(v=>v!==null && v!==undefined && String(v).trim()!=='');
+      const strings=non.filter(v=>typeof v==='string').length;
+      if (non.length < 3 || strings < 2) continue;
+      let dataRows=0, end=r;
+      let blankRun=0;
+      for (let rr=r+1; rr<Math.min(matrix.length, r+5000); rr++) {
+        const cnt=(matrix[rr]||[]).filter(v=>v!==null && v!==undefined && String(v).trim()!=='').length;
+        if (cnt>=2) { dataRows++; end=rr; blankRun=0; }
+        else { blankRun++; if (blankRun>=2) break; }
+      }
+      if (dataRows >= 2) {
+        const title = r>0 ? cleanText((matrix[r-1]||[]).find(v=>cleanText(v))) : '';
+        blocks.push({name:title || `Bảng từ dòng ${r+1}`, headerRow:r, startRow:r+1, endRow:end, score:dataRows*non.length});
+        r = Math.min(end, r+50);
+      }
+      if (blocks.length >= 16) break;
+    }
+    return blocks.sort((a,b)=>b.score-a.score);
+  }
+
+  function recordsFromBlock(matrix, block, sourceSheet='') {
+    const headers=uniqueHeaders(matrix[block.headerRow]||[]);
+    const lastUseful=Math.max(0,...headers.map((h,i)=>h.startsWith('Column ') ? -1 : i));
+    const records=[];
+    for (let r=block.startRow; r<=Math.min(block.endRow,matrix.length-1); r++) {
+      const row=matrix[r]||[];
+      if (!row.some(v=>v!==null && v!==undefined && String(v).trim()!=='')) continue;
+      const rec={Sheet:sourceSheet, 'Source Row':r+1};
+      for (let c=0; c<=Math.max(lastUseful,row.length-1); c++) {
+        if (c >= headers.length) continue;
+        let v=row[c];
+        const d=excelDate(v);
+        if (d && /ngày|date|tháng/i.test(headers[c])) v=d;
+        rec[headers[c]]=v;
+      }
+      records.push(rec);
+    }
+    return records;
+  }
+
+  function normalizedShopeeRows(matrix, sourceSheet='') {
+    const monthRowIndex = matrix.findIndex(row => (row||[]).filter(v=>/^tháng\s*\d+/i.test(cleanText(v))).length >= 2);
+    if (monthRowIndex < 0) return [];
+    const monthRow=matrix[monthRowIndex]||[];
+    const starts=[]; monthRow.forEach((v,i)=>{if(/^tháng\s*\d+/i.test(cleanText(v)))starts.push({i,month:cleanText(v)});});
+    const records=[];
+    for (const b of starts) {
+      for (let r=monthRowIndex+2; r<matrix.length; r++) {
+        const row=matrix[r]||[];
+        const category=cleanText(row[b.i]);
+        if (!category) continue;
+        if (norm(category)==='tong') break;
+        if (norm(category).includes('note')) break;
+        const spend=num(row[b.i+1]), buyers=num(row[b.i+2]), orders=num(row[b.i+3]), revenue=num(row[b.i+4]), cpo=num(row[b.i+5]);
+        if ([spend,buyers,orders,revenue,cpo].every(v=>v===null)) continue;
+        records.push({Sheet:sourceSheet, Month:b.month, Category:category, 'Ad Spend':spend, Buyers:buyers, Orders:orders, Revenue:revenue, 'Cost per Order':cpo, 'Estimated Digital Revenue':isNum(revenue)?revenue*.5:null});
+      }
+    }
+    return records;
+  }
+
+  function buildPivotDatasets() {
+    state.pivotDatasets.clear();
+    const priority = [
+      'Tháng 6.2026','TỔNG 2026','KPI CHI TIẾT 2026','Brand Awareness',
+      'ĐƠN HÀNG ONLINE + SP AFF','ĐƠN HÀNG SHOPEE','ĐƠN HÀNG TIKTOK'
+    ];
+    for (const label of priority) {
+      const sheet=findSheet(label);
+      if (!sheet) continue;
+      const matrix=getMatrix(sheet,false);
+      const datasets=[];
+      const n=norm(sheet);
+      if (n.includes('thang 6.2026') || n.includes('tong 2026') || n.includes('kpi chi tiet 2026')) {
+        const parsed=parseKPIBlocks(matrix,sheet);
+        if (parsed.records.length) datasets.push({name:'KPI chuẩn hóa',records:parsed.records});
+      }
+      if (n.includes('brand awareness')) {
+        const rec=parseBrandAwareness(matrix,sheet);
+        if (rec.length) datasets.push({name:'Brand Awareness chuẩn hóa',records:rec});
+      }
+      if (n.includes('don hang shopee')) {
+        const rec=normalizedShopeeRows(matrix,sheet);
+        if (rec.length) datasets.push({name:'Shopee theo tháng & ngành hàng',records:rec});
+      }
+      if (n.includes('don hang tiktok')) {
+        const rec=parseTikTokDaily(matrix,sheet);
+        if (rec.length) datasets.push({name:'TikTok theo ngày',records:rec});
+      }
+      const blocks=autoDetectBlocks(matrix,sheet).slice(0,8);
+      blocks.forEach(b => {
+        const rec=recordsFromBlock(matrix,b,sheet);
+        if (rec.length) datasets.push({name:`Bảng gốc · ${b.name} · dòng ${b.headerRow+1}`,records:rec,block:b});
+      });
+      state.pivotDatasets.set(sheet,datasets);
+    }
+  }
+
+  function scanWorkbookQuality() {
+    const errors=[], formulaCount={value:0}, nonEmpty={value:0};
+    for (const name of state.workbook.SheetNames) {
+      const ws=state.workbook.Sheets[name];
+      for (const [addr,cell] of Object.entries(ws)) {
+        if (addr.startsWith('!')) continue;
+        nonEmpty.value++;
+        if (cell.f) formulaCount.value++;
+        const display = cell.w ?? cell.v;
+        const isError = cell.t === 'e' || (typeof display === 'string' && /#(DIV\/0!|VALUE!|REF!|N\/A|NAME\?|NUM!|NULL!)/i.test(display));
+        if (isError && errors.length<300) errors.push({Sheet:name,Cell:addr,Error:String(display),Formula:cell.f||''});
+      }
+    }
+    state.errors=errors;
+    return {formulaCount:formulaCount.value, nonEmpty:nonEmpty.value, errors:errors.length};
+  }
+
+  function detectWarnings(monthSheet, period) {
+    const warnings=[];
+    const required=['Tháng 6.2026','TỔNG 2026','KPI CHI TIẾT 2026','Brand Awareness','ĐƠN HÀNG ONLINE + SP AFF','ĐƠN HÀNG SHOPEE','ĐƠN HÀNG TIKTOK'];
+    for (const r of required) if (!findSheet(r)) warnings.push(`Không tìm thấy sheet ưu tiên: ${r}`);
+    if (monthSheet) {
+      const m=getMatrix(monthSheet,true);
+      const head=(m.slice(0,8).flat().filter(Boolean).join(' '));
+      const sheetToken=(monthSheet.match(/(\d{1,2})\.(\d{4})/)||[]).slice(1).join('/');
+      const titleToken=(head.match(/tháng\s*(\d{1,2})[/.](\d{4})/i)||[]).slice(1).join('/');
+      if (sheetToken && titleToken && sheetToken!==titleToken) warnings.push(`Tên sheet “${monthSheet}” nhưng tiêu đề nội dung đang thể hiện tháng ${titleToken}. Nên kiểm tra lại kỳ báo cáo.`);
+    }
+    if (state.errors.length) warnings.push(`Workbook có ít nhất ${state.errors.length} ô lỗi công thức được nhận diện trong giới hạn quét.`);
+    if (!window.XLSX) warnings.push('Không tải được thư viện đọc Excel. Kiểm tra kết nối Internet hoặc lưu thư viện SheetJS cục bộ.');
+    state.warnings=warnings;
+  }
+
+  function destroyCharts() {
+    Object.values(state.charts).forEach(c=>{try{c.destroy();}catch(e){}}); state.charts={};
+  }
+
+  function chartColors(alpha=.75) {
+    return [
+      `rgba(88,217,238,${alpha})`,`rgba(129,150,255,${alpha})`,`rgba(96,229,174,${alpha})`,
+      `rgba(255,200,107,${alpha})`,`rgba(255,127,143,${alpha})`,`rgba(119,196,255,${alpha})`,
+      `rgba(190,138,255,${alpha})`,`rgba(80,210,172,${alpha})`,`rgba(255,155,100,${alpha})`,
+      `rgba(138,197,94,${alpha})`,`rgba(239,127,202,${alpha})`,`rgba(100,165,255,${alpha})`
+    ];
+  }
+
+  function chartDefaults() {
+    const text=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+    const line=getComputedStyle(document.documentElement).getPropertyValue('--line').trim();
+    return {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:text,usePointStyle:true,boxWidth:8}},tooltip:{mode:'index',intersect:false}},
+      scales:{x:{ticks:{color:text,maxRotation:45,minRotation:0},grid:{color:line}},y:{ticks:{color:text},grid:{color:line},beginAtZero:true}}
+    };
+  }
+
+  function createChart(id,type,data,options={}) {
+    if (!window.Chart) return;
+    const ctx=$(id); if (!ctx) return;
+    const base=chartDefaults();
+    state.charts[id]=new Chart(ctx,{type,data,options:{...base,...options,plugins:{...base.plugins,...(options.plugins||{})},scales:options.scales===undefined?base.scales:options.scales}});
+  }
+
+  function buildDashboard() {
+    destroyCharts();
+    const monthSheet = findSheet('Tháng 6.2026') || state.workbook.SheetNames.find(n=>/tháng\s*\d+\.\d{4}/i.test(n)) || state.workbook.SheetNames[0];
+    const matrix=getMatrix(monthSheet,false);
+    const parsed=parseKPIBlocks(matrix,monthSheet);
+    state.kpiRecords=parsed.records; state.kpiBrands=parsed.brands;
+
+    const awarenessSheet=findSheet('Brand Awareness');
+    state.awarenessRecords=awarenessSheet?parseBrandAwareness(getMatrix(awarenessSheet,false),awarenessSheet):[];
+    const tiktokSheet=findSheet('ĐƠN HÀNG TIKTOK');
+    state.tiktokDaily=tiktokSheet?parseTikTokDaily(getMatrix(tiktokSheet,false),tiktokSheet):[];
+    const shopeeSheet=findSheet('ĐƠN HÀNG SHOPEE');
+    state.shopeeMonthly=shopeeSheet?parseShopeeMonthly(getMatrix(shopeeSheet,false),shopeeSheet):[];
+
+    const display=getMatrix(monthSheet,true);
+    const head=display.slice(0,8).flat().filter(Boolean).join(' ');
+    const period=(head.match(/tháng\s*\d{1,2}[/.]\d{4}/i)||[monthSheet])[0];
+    $('periodText').textContent=`Nguồn chính: ${monthSheet} · Kỳ nhận diện: ${period}`;
+
+    const totalPlan=parsed.brands.reduce((s,b)=>s+(isNum(b.budgetPlan)?b.budgetPlan:0),0);
+    const totalSpend=parsed.brands.reduce((s,b)=>s+(isNum(b.actualSpend)?b.actualSpend:0),0);
+    const avgAch=parsed.brands.map(b=>b.avgAchievement).filter(isNum);
+    const meanAch=avgAch.length?avgAch.reduce((a,b)=>a+b,0)/avgAch.length:null;
+    const usage=totalPlan?totalSpend/totalPlan:null;
+    const kpiMet=parsed.records.filter(x=>isNum(x['Achievement %'])).filter(x=>x['Achievement %']>=1).length;
+    const kpiTotal=parsed.records.filter(x=>isNum(x['Achievement %'])).length;
+    const errorCount=state.errors.length;
+
+    const cards=[
+      {label:'Ngân sách thực tế',value:compact(totalSpend),note:`Kế hoạch ${compact(totalPlan)} · ${pct(usage)}`,class:usage>1.05?'bad':usage>.9?'good':'warn'},
+      {label:'KPI hoàn thành bình quân',value:pct(meanAch),note:`${kpiMet}/${kpiTotal} KPI đạt hoặc vượt 100%`,class:meanAch>=1?'good':meanAch>=.8?'warn':'bad'},
+      {label:'Thương hiệu / nhóm KPI',value:fmt(parsed.brands.length),note:`${fmt(parsed.records.length)} dòng KPI được chuẩn hóa`,class:''},
+      {label:'Lỗi công thức nhận diện',value:fmt(errorCount),note:'Giới hạn hiển thị tối đa 300 lỗi',class:errorCount?'bad':'good'}
+    ];
+    $('metricCards').innerHTML=cards.map(c=>`<article class="metric-card ${c.class}"><div class="label">${escapeHtml(c.label)}</div><div class="value">${escapeHtml(c.value)}</div><div class="note">${escapeHtml(c.note)}</div></article>`).join('');
+
+    const top=parsed.brands.filter(b=>isNum(b.actualSpend)).sort((a,b)=>b.actualSpend-a.actualSpend).slice(0,12);
+    const colors=chartColors(.72);
+    createChart('budgetChart','bar',{labels:top.map(x=>x.brand),datasets:[
+      {label:'Kế hoạch',data:top.map(x=>x.budgetPlan),backgroundColor:'rgba(129,150,255,.42)',borderColor:'rgba(129,150,255,.9)',borderWidth:1},
+      {label:'Thực tế',data:top.map(x=>x.actualSpend),backgroundColor:'rgba(88,217,238,.72)',borderColor:'rgba(88,217,238,1)',borderWidth:1}
+    ]},{scales:{x:chartDefaults().scales.x,y:{...chartDefaults().scales.y,ticks:{...chartDefaults().scales.y.ticks,callback:v=>compact(v)}}}});
+
+    const topKpi=parsed.brands.filter(b=>isNum(b.avgAchievement)||isNum(b.budgetUsage)).sort((a,b)=>(b.actualSpend||0)-(a.actualSpend||0)).slice(0,12);
+    createChart('kpiChart','bar',{labels:topKpi.map(x=>x.brand),datasets:[
+      {label:'KPI bình quân',data:topKpi.map(x=>isNum(x.avgAchievement)?x.avgAchievement*100:null),backgroundColor:'rgba(96,229,174,.70)'},
+      {label:'Giải ngân',data:topKpi.map(x=>isNum(x.budgetUsage)?x.budgetUsage*100:null),backgroundColor:'rgba(255,200,107,.68)'}
+    ]},{scales:{x:chartDefaults().scales.x,y:{...chartDefaults().scales.y,ticks:{...chartDefaults().scales.y.ticks,callback:v=>`${v}%`}}}});
+
+    const channels={};
+    parsed.records.forEach(x=>{ if(isNum(x['Actual Spend'])&&x['Actual Spend']!==0) channels[x.Channel]=(channels[x.Channel]||0)+x['Actual Spend']; });
+    const channelEntries=Object.entries(channels).sort((a,b)=>b[1]-a[1]);
+    createChart('channelChart','doughnut',{labels:channelEntries.map(x=>x[0]),datasets:[{data:channelEntries.map(x=>x[1]),backgroundColor:colors,borderWidth:0}]},{scales:{},plugins:{legend:{position:'bottom',labels:{color:getComputedStyle(document.documentElement).getPropertyValue('--muted').trim(),usePointStyle:true,boxWidth:8}},tooltip:{callbacks:{label:c=>`${c.label}: ${fmt(c.raw)} VND`}}}});
+
+    const byBrand={}; const platforms=[...new Set(state.awarenessRecords.map(x=>x.Platform))];
+    state.awarenessRecords.forEach(x=>{if(isNum(x.Reach)){byBrand[x.Brand]??={};byBrand[x.Brand][x.Platform]=(byBrand[x.Brand][x.Platform]||0)+x.Reach;}});
+    const awTop=Object.entries(byBrand).map(([brand,v])=>({brand,total:Object.values(v).reduce((a,b)=>a+b,0),v})).sort((a,b)=>b.total-a.total).slice(0,10);
+    createChart('awarenessChart','bar',{labels:awTop.map(x=>x.brand),datasets:platforms.map((p,i)=>({label:p,data:awTop.map(x=>x.v[p]||0),backgroundColor:colors[i%colors.length]}))},{scales:{x:{...chartDefaults().scales.x,stacked:true},y:{...chartDefaults().scales.y,stacked:true,ticks:{...chartDefaults().scales.y.ticks,callback:v=>compact(v)}}}});
+
+    createChart('tiktokTrendChart','line',{labels:state.tiktokDaily.map(x=>x.Date.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'})),datasets:[{label:'GMV',data:state.tiktokDaily.map(x=>x.GMV),borderColor:'rgba(88,217,238,1)',backgroundColor:'rgba(88,217,238,.12)',fill:true,tension:.28,pointRadius:2}]},{scales:{x:{...chartDefaults().scales.x,grid:{display:false}},y:{...chartDefaults().scales.y,ticks:{...chartDefaults().scales.y.ticks,callback:v=>compact(v)}}}});
+
+    createChart('shopeeTrendChart','bar',{labels:state.shopeeMonthly.map(x=>x.Month),datasets:[
+      {type:'line',label:'Doanh số',data:state.shopeeMonthly.map(x=>x.Revenue),borderColor:'rgba(96,229,174,1)',backgroundColor:'rgba(96,229,174,.15)',yAxisID:'y',tension:.25},
+      {type:'bar',label:'Ngân sách',data:state.shopeeMonthly.map(x=>x['Ad Spend']),backgroundColor:'rgba(129,150,255,.62)',yAxisID:'y'}
+    ]},{scales:{x:chartDefaults().scales.x,y:{...chartDefaults().scales.y,ticks:{...chartDefaults().scales.y.ticks,callback:v=>compact(v)}}}});
+
+    renderInsights(); renderKpiTable(); renderQuality();
+  }
+
+  function renderInsights() {
+    const brands=state.kpiBrands;
+    const strong=brands.filter(b=>isNum(b.avgAchievement)&&isNum(b.budgetUsage)&&b.avgAchievement>=1&&b.budgetUsage<=1.05).sort((a,b)=>(b.efficiency||0)-(a.efficiency||0)).slice(0,6);
+    const under=brands.filter(b=>isNum(b.avgAchievement)&&b.avgAchievement<.8).sort((a,b)=>a.avgAchievement-b.avgAchievement).slice(0,6);
+    const over=brands.filter(b=>isNum(b.budgetUsage)&&b.budgetUsage>1.05).sort((a,b)=>b.budgetUsage-a.budgetUsage).slice(0,6);
+    const dataNotes=[];
+    const awarenessTop=[...state.awarenessRecords].filter(x=>isNum(x.Reach)).sort((a,b)=>b.Reach-a.Reach).slice(0,3);
+    awarenessTop.forEach(x=>dataNotes.push(`${x.Brand} dẫn đầu reach trên ${x.Platform}: ${compact(x.Reach)}.`));
+    if (state.shopeeMonthly.length>=2) {
+      const a=state.shopeeMonthly[0],b=state.shopeeMonthly[1];
+      if(isNum(a.Revenue)&&isNum(b.Revenue)&&b.Revenue) dataNotes.push(`Doanh số Shopee ${a.Month} ${a.Revenue>=b.Revenue?'tăng':'giảm'} ${Math.abs((a.Revenue-b.Revenue)/b.Revenue*100).toFixed(1)}% so với ${b.Month}.`);
+    }
+    if(state.tiktokDaily.length) {
+      const total=state.tiktokDaily.reduce((s,x)=>s+(x.GMV||0),0); dataNotes.push(`GMV TikTok trong bảng ngày đạt ${compact(total)}.`);
+    }
+
+    const cards=[
+      {class:'good',title:'Điểm sáng',items:strong.length?strong.map(b=>`${b.brand}: KPI bình quân ${pct(b.avgAchievement)}, giải ngân ${pct(b.budgetUsage)}.`):['Chưa có nhóm vừa đạt KPI ≥100% vừa giữ giải ngân ≤105% trong dữ liệu nhận diện.']},
+      {class:'warn',title:'Cần theo dõi',items:under.length?under.map(b=>`${b.brand}: KPI bình quân mới đạt ${pct(b.avgAchievement)}.`):['Không phát hiện nhóm KPI dưới 80%.']},
+      {class:'bad',title:'Rủi ro ngân sách',items:over.length?over.map(b=>`${b.brand}: giải ngân ${pct(b.budgetUsage)} so với kế hoạch.`):['Không phát hiện nhóm giải ngân vượt 105%.']},
+      {class:'',title:'Brand & Commerce Insight',items:dataNotes.length?dataNotes:['Chưa đủ dữ liệu Brand Awareness hoặc E-commerce để tạo nhận định.']},
+      {class:'',title:'Kiểm tra dữ liệu',items:state.warnings.length?state.warnings:['Không phát hiện cảnh báo cấu trúc chính.']},
+      {class:'',title:'Khuyến nghị vận hành',items:[
+        'Ưu tiên kiểm tra nhóm KPI thấp nhưng tỷ lệ giải ngân cao trước khi tăng ngân sách.',
+        'Đối chiếu hiệu quả theo creative, audience, sản phẩm và chất lượng follow-up thay vì chỉ nhìn CPL/CPC.',
+        'Các chỉ số vượt kế hoạch lớn cần được kiểm tra trùng lặp, thay đổi cách đo và phạm vi attribution.'
+      ]}
+    ];
+    $('insightsGrid').innerHTML=cards.map(c=>`<article class="insight-card ${c.class}"><h3>${escapeHtml(c.title)}</h3><ul>${c.items.map(i=>`<li>${escapeHtml(i)}</li>`).join('')}</ul></article>`).join('');
+  }
+
+  function renderKpiTable() {
+    const q=norm($('kpiSearch').value);
+    const records=state.kpiRecords.filter(r=>!q||Object.values(r).some(v=>norm(v).includes(q)));
+    renderRecordTable($('kpiTableWrap'),records,{maxRows:500});
+  }
+
+  function renderRecordTable(container, records, opts={}) {
+    if (!records || !records.length) { container.innerHTML='<div class="empty">Không có dữ liệu phù hợp.</div>'; return; }
+    const fields=opts.fields||Object.keys(records[0]);
+    const maxRows=opts.maxRows||records.length;
+    const rows=records.slice(0,maxRows);
+    let html='<table><thead><tr>'+fields.map(f=>`<th>${escapeHtml(f)}</th>`).join('')+'</tr></thead><tbody>';
+    for(const r of rows){html+='<tr>'+fields.map(f=>{const v=r[f];const isError=typeof v==='string'&&/^#/.test(v);return `<td class="${typeof v==='number'?'number':''} ${isError?'error':''}">${escapeHtml(formatValue(v,f))}</td>`;}).join('')+'</tr>';}
+    html+='</tbody></table>'; container.innerHTML=html;
+  }
+
+  function setupPivot() {
+    buildPivotDatasets();
+    const select=$('pivotSheet'); select.innerHTML='';
+    [...state.pivotDatasets.keys()].forEach(name=>select.add(new Option(name,name)));
+    if (!select.options.length) { $('pivotTableWrap').innerHTML='<div class="empty">Không tìm thấy các sheet Pivot ưu tiên.</div>'; return; }
+    updatePivotDatasetOptions();
+  }
+
+  function updatePivotDatasetOptions() {
+    const sheet=$('pivotSheet').value; const datasets=state.pivotDatasets.get(sheet)||[];
+    const sel=$('pivotDataset'); sel.innerHTML=''; datasets.forEach((d,i)=>sel.add(new Option(`${d.name} (${fmt(d.records.length)} dòng)`,String(i))));
+    updatePivotFields();
+  }
+
+  function chooseDefault(fields, patterns, fallback=0) {
+    for(const p of patterns){const i=fields.findIndex(f=>norm(f).includes(p));if(i>=0)return i;} return fallback;
+  }
+
+  function updatePivotFields() {
+    const sheet=$('pivotSheet').value; const datasets=state.pivotDatasets.get(sheet)||[]; const ds=datasets[Number($('pivotDataset').value)||0];
+    state.currentPivotRecords=ds?.records||[]; state.pivotPage=1;
+    const fields=state.currentPivotRecords.length?Object.keys(state.currentPivotRecords[0]):[];
+    const selects=[$('pivotRow'),$('pivotCol'),$('pivotValue')]; selects.forEach(s=>s.innerHTML='');
+    $('pivotCol').add(new Option('(Không dùng cột)',''));
+    fields.forEach(f=>{ $('pivotRow').add(new Option(f,f)); $('pivotCol').add(new Option(f,f)); $('pivotValue').add(new Option(f,f)); });
+    if(fields.length){
+      $('pivotRow').selectedIndex=chooseDefault(fields,['brand','category','nganh hang','date','month'],0);
+      const ci=chooseDefault(fields,['channel','platform','month'], -1); $('pivotCol').value=ci>=0?fields[ci]:'';
+      $('pivotValue').selectedIndex=chooseDefault(fields,['actual spend','revenue','gmv','actual','reach','ad spend','orders'],Math.min(1,fields.length-1));
+    }
+    $('datasetMeta').innerHTML=`<span>${escapeHtml(sheet||'—')}</span><span>${fmt(state.currentPivotRecords.length)} dòng</span><span>${fmt(fields.length)} trường dữ liệu</span><span>Xử lý cục bộ</span>`;
+    buildPivot();
+  }
+
+  function aggregate(values,agg) {
+    const ns=values.map(num).filter(v=>v!==null);
+    if(agg==='count') return values.length;
+    if(!ns.length)return null;
+    if(agg==='sum')return ns.reduce((a,b)=>a+b,0);
+    if(agg==='avg')return ns.reduce((a,b)=>a+b,0)/ns.length;
+    if(agg==='min')return Math.min(...ns);
+    if(agg==='max')return Math.max(...ns);
+    return null;
+  }
+
+  function buildPivot() {
+    const records=state.currentPivotRecords; if(!records.length){$('pivotTableWrap').innerHTML='<div class="empty">Không có dataset.</div>';return;}
+    const rowField=$('pivotRow').value, colField=$('pivotCol').value, valueField=$('pivotValue').value, agg=$('pivotAgg').value;
+    const rows=[...new Set(records.map(r=>cleanText(r[rowField])||'(Trống)'))];
+    const cols=colField?[...new Set(records.map(r=>cleanText(r[colField])||'(Trống)'))]:['Giá trị'];
+    const matrix=[];
+    const rowTotals={}; const colTotals={};
+    rows.forEach(rv=>{
+      const line={row:rv,values:{}}; let rt=[];
+      cols.forEach(cv=>{
+        const vals=records.filter(r=>(cleanText(r[rowField])||'(Trống)')===rv && (!colField || (cleanText(r[colField])||'(Trống)')===cv)).map(r=>r[valueField]);
+        const val=aggregate(vals,agg); line.values[cv]=val; if(val!==null)rt.push(val); colTotals[cv]=(colTotals[cv]||[]).concat(vals);
+      });
+      rowTotals[rv]=aggregate(rt,'sum'); matrix.push(line);
+    });
+    state.currentPivotMatrix={rows,cols,matrix,rowTotals,colTotals,rowField,valueField,agg}; state.pivotMode='pivot';
+    renderPivotMatrix();
+  }
+
+  function renderPivotMatrix() {
+    const p=state.currentPivotMatrix; if(!p){return;}
+    let html=`<table><thead><tr><th>${escapeHtml(p.rowField)}</th>${p.cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}<th>Tổng</th></tr></thead><tbody>`;
+    p.matrix.forEach(line=>{html+=`<tr><td>${escapeHtml(line.row)}</td>${p.cols.map(c=>`<td class="number">${escapeHtml(formatValue(line.values[c],p.valueField))}</td>`).join('')}<td class="number"><b>${escapeHtml(formatValue(p.rowTotals[line.row],p.valueField))}</b></td></tr>`;});
+    html+=`<tr class="pivot-total"><td>Tổng</td>${p.cols.map(c=>`<td class="number">${escapeHtml(formatValue(aggregate(p.colTotals[c]||[],p.agg),p.valueField))}</td>`).join('')}<td></td></tr>`;
+    html+='</tbody></table>';$('pivotTableWrap').innerHTML=html;$('pivotPagination').innerHTML='<span>Pivot Table tổng hợp từ dataset đang chọn.</span>';
+  }
+
+  function showRawPivot() { state.pivotMode='raw'; state.pivotPage=1; renderRawPivot(); }
+  function renderRawPivot() {
+    const q=norm($('pivotSearch').value); let records=state.currentPivotRecords.filter(r=>!q||Object.values(r).some(v=>norm(v).includes(q)));
+    const pages=Math.max(1,Math.ceil(records.length/state.pivotPageSize)); state.pivotPage=Math.min(state.pivotPage,pages);
+    const start=(state.pivotPage-1)*state.pivotPageSize; renderRecordTable($('pivotTableWrap'),records.slice(start,start+state.pivotPageSize));
+    $('pivotPagination').innerHTML=`<span>${fmt(records.length)} dòng · Trang ${state.pivotPage}/${pages}</span><div class="page-actions"><button class="btn small" id="pivotPrev">← Trước</button><button class="btn small" id="pivotNext">Sau →</button></div>`;
+    $('pivotPrev').onclick=()=>{if(state.pivotPage>1){state.pivotPage--;renderRawPivot();}};
+    $('pivotNext').onclick=()=>{if(state.pivotPage<pages){state.pivotPage++;renderRawPivot();}};
+  }
+
+  function setupSheetBrowser() {
+    const list=$('sheetList'); list.innerHTML='';
+    state.workbook.SheetNames.forEach((name,i)=>{
+      const st=sheetStats(name); const btn=document.createElement('button'); btn.className='sheet-item'; btn.dataset.sheet=name;
+      btn.innerHTML=`<span>${escapeHtml(name)}</span><small>${fmt(st.rows)}×${fmt(st.cols)}</small>`;
+      btn.onclick=()=>{document.querySelectorAll('.sheet-item').forEach(x=>x.classList.remove('active'));btn.classList.add('active');state.currentSheet=name;state.sheetPage=1;renderSheet();};
+      list.appendChild(btn); if(i===0)btn.classList.add('active');
+    });
+    state.currentSheet=state.workbook.SheetNames[0]; renderSheet();
+  }
+
+  function renderSheet() {
+    if(!state.currentSheet)return;
+    const matrix=getMatrix(state.currentSheet,true); const q=norm($('sheetSearch').value);
+    let rows=matrix.map((r,i)=>({i,row:r})).filter(x=>!q||(x.row||[]).some(v=>norm(v).includes(q)));
+    const pages=Math.max(1,Math.ceil(rows.length/state.sheetPageSize)); state.sheetPage=Math.min(state.sheetPage,pages);
+    const start=(state.sheetPage-1)*state.sheetPageSize; const view=rows.slice(start,start+state.sheetPageSize);
+    const maxCols=Math.min(60,Math.max(1,...view.map(x=>(x.row||[]).length)));
+    let html='<table><thead><tr><th>#</th>'+Array.from({length:maxCols},(_,i)=>`<th>${XLSX.utils.encode_col(i)}</th>`).join('')+'</tr></thead><tbody>';
+    view.forEach(x=>{html+=`<tr><td>${x.i+1}</td>${Array.from({length:maxCols},(_,c)=>{const v=(x.row||[])[c];const err=typeof v==='string'&&/^#/.test(v);return `<td class="${typeof v==='number'?'number':''} ${err?'error':''}">${escapeHtml(formatValue(v))}</td>`;}).join('')}</tr>`;});
+    html+='</tbody></table>';$('sheetTableWrap').innerHTML=html;
+    const st=sheetStats(state.currentSheet); $('sheetMeta').innerHTML=`<span>${escapeHtml(state.currentSheet)}</span><span>Vùng ${st.ref}</span><span>${fmt(st.rows)} dòng</span><span>${fmt(st.cols)} cột</span>`;
+    $('sheetPagination').innerHTML=`<span>${fmt(rows.length)} dòng phù hợp · Trang ${state.sheetPage}/${pages}</span><span>Hiển thị tối đa 60 cột / trang.</span>`;
+    $('prevSheetPage').onclick=()=>{if(state.sheetPage>1){state.sheetPage--;renderSheet();}};$('nextSheetPage').onclick=()=>{if(state.sheetPage<pages){state.sheetPage++;renderSheet();}};
+  }
+
+  function renderQuality() {
+    const stats=scanWorkbookQuality();
+    const visible=state.workbook.SheetNames.filter(n=>state.workbook.Workbook?.Sheets?.find(s=>s.name===n)?.Hidden!==1).length;
+    $('qualitySummary').innerHTML=[
+      ['Tổng số sheet',fmt(state.workbook.SheetNames.length)],['Sheet hiển thị',fmt(visible)],['Ô có dữ liệu',fmt(stats.nonEmpty)],['Ô chứa công thức',fmt(stats.formulaCount)],['Lỗi được ghi nhận',fmt(state.errors.length)]
+    ].map(([a,b])=>`<li><span>${a}</span><b>${b}</b></li>`).join('');
+    $('qualityWarnings').innerHTML=(state.warnings.length?state.warnings:['Không phát hiện cảnh báo chính.']).map((w,i)=>`<li><span>${escapeHtml(w)}</span><b>${state.warnings.length?'Kiểm tra':'OK'}</b></li>`).join('');
+    renderRecordTable($('errorTableWrap'),state.errors,{fields:['Sheet','Cell','Error','Formula'],maxRows:300});
+  }
+
+  function csvEscape(v) { const s=v instanceof Date?v.toISOString().slice(0,10):String(v??''); return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s; }
+  function downloadCSV(records,name='data.csv') {
+    if(!records?.length)return;
+    const fields=Object.keys(records[0]); const csv='\ufeff'+[fields.join(','),...records.map(r=>fields.map(f=>csvEscape(r[f])).join(','))].join('\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  }
+
+  async function loadFile(file) {
+    if(!window.XLSX){alert('Không tải được thư viện SheetJS. Vui lòng kiểm tra kết nối Internet và tải lại trang.');return;}
+    state.file=file; state.matrixCache.clear(); state.displayCache.clear(); state.pivotDatasets.clear(); destroyCharts();
+    showLoading('Đang đọc workbook…',`Đang xử lý ${file.name}. File lớn có thể mất từ vài giây đến khoảng một phút.`);
+    await new Promise(r=>setTimeout(r,40));
+    try {
+      const buffer=await file.arrayBuffer();
+      state.workbook=XLSX.read(buffer,{type:'array',cellDates:true,cellFormula:true,cellNF:true,cellStyles:false});
+      scanWorkbookQuality();
+      const monthSheet=findSheet('Tháng 6.2026')||state.workbook.SheetNames.find(n=>/tháng\s*\d+\.\d{4}/i.test(n));
+      detectWarnings(monthSheet,'');
+      buildDashboard(); setupPivot(); setupSheetBrowser(); renderQuality();
+      $('fileName').textContent=file.name;
+      $('fileDetail').textContent=`${fileSize(file.size)} · ${state.workbook.SheetNames.length} sheet · ${fmt(state.errors.length)} lỗi công thức nhận diện`;
+      $('fileStatus').classList.add('show'); $('workspace').classList.add('show');
+      $('statusPill').textContent='Đã phân tích';
+      window.scrollTo({top:$('fileStatus').offsetTop-75,behavior:'smooth'});
+    } catch(err) {
+      console.error(err); alert(`Không thể đọc file Excel: ${err.message || err}`);
+    } finally { hideLoading(); }
+  }
+
+  // UI events
+  $('chooseBtn').onclick=()=>$('fileInput').click(); $('fileInput').onchange=e=>e.target.files[0]&&loadFile(e.target.files[0]);
+  const dz=$('dropzone');
+  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
+  dz.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)loadFile(f);});
+  document.querySelectorAll('.tab-btn').forEach(btn=>btn.onclick=()=>{
+    document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active')); document.querySelectorAll('.tab-pane').forEach(x=>x.classList.remove('active'));
+    btn.classList.add('active'); $(`tab-${btn.dataset.tab}`).classList.add('active');
+  });
+  $('themeBtn').onclick=()=>{const light=document.documentElement.dataset.theme==='light';document.documentElement.dataset.theme=light?'dark':'light';$('themeBtn').innerHTML=light?'☀︎ <span class="text-label">Light</span>':'☾ <span class="text-label">Dark</span>'; if(state.workbook)buildDashboard();};
+  $('printBtn').onclick=()=>window.print(); $('refreshBtn').onclick=()=>state.workbook&&buildDashboard();
+  $('kpiSearch').oninput=renderKpiTable; $('exportKpiBtn').onclick=()=>downloadCSV(state.kpiRecords,'kpi-normalized.csv');
+  $('pivotSheet').onchange=updatePivotDatasetOptions; $('pivotDataset').onchange=updatePivotFields; $('buildPivotBtn').onclick=buildPivot; $('showRawBtn').onclick=showRawPivot;
+  $('pivotSearch').oninput=()=>{if(state.pivotMode==='raw')renderRawPivot();};
+  $('exportPivotBtn').onclick=()=>downloadCSV(state.currentPivotRecords,`${($('pivotSheet').value||'pivot').replace(/[^\p{L}\p{N}]+/gu,'_')}.csv`);
+  $('sheetSearch').oninput=()=>{state.sheetPage=1;renderSheet();};
+
+  window.addEventListener('error',e=>{
+    if(String(e.message||'').includes('XLSX')||String(e.message||'').includes('Chart')) console.warn('External library error',e);
+  });
+})();
+</script>
+</body>
+</html>
